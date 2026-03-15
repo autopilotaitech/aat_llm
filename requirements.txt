@@ -1,0 +1,10 @@
+llama-cpp-python
+fastapi
+uvicorn
+requests
+huggingface_hub
+rich
+pytest
+httpx
+python-multipart
+pytest-asyncio

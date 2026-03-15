@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>aat_llm</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  background: #1a1a1a;
+  color: #e0e0e0;
+  height: 100vh;
+  display: flex;
+  overflow: hidden;
+}
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+
+/* --- Left Sidebar --- */
+.left-sidebar {
+  width: 240px;
+  background: #111;
+  border-right: 1px solid #2a2a2a;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.left-sidebar h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #7c6af7;
+}
+
+.left-sidebar label { font-size: 12px; color: #888; margin-bottom: 4px; display: block; }
+
+select, input[type="text"], textarea {
+  background: #2a2a2a;
+  border: 1px solid #333;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  width: 100%;
+  outline: none;
+}
+select:focus, input[type="text"]:focus, textarea:focus { border-color: #7c6af7; }
+
+button {
+  background: #7c6af7;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  font-weight: 500;
+}
+button:hover { background: #6a5ad4; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.status-dot.online { background: #4ade80; }
+.status-dot.offline { background: #ef4444; }
+
+.pull-section { display: flex; flex-direction: column; gap: 8px; }
+.pull-status { font-size: 12px; color: #888; min-height: 16px; }
+
+/* --- Chat Panel --- */
+.chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #1e1e1e;
+  min-width: 0;
+}
+
+#chat-history {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.message { max-width: 80%; display: flex; flex-direction: column; gap: 4px; }
+.message.user { align-self: flex-end; }
+.message.assistant { align-self: flex-start; }
+
+.message-label { font-size: 11px; color: #888; }
+.message.user .message-label { text-align: right; }
+
+.message-bubble {
+  padding: 10px 14px;
+  border-radius: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.message.user .message-bubble {
+  background: #2d2d2d;
+  border-left: 3px solid #7c6af7;
+}
+.message.assistant .message-bubble {
+  background: #252525;
+  border-left: 3px solid #4ade80;
+}
+
+.no-models-banner {
+  text-align: center;
+  color: #888;
+  padding: 40px 20px;
+  font-size: 15px;
+}
+
+/* --- Input Bar --- */
+.input-bar {
+  padding: 12px 20px;
+  border-top: 1px solid #2a2a2a;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  background: #1e1e1e;
+}
+
+#prompt-input {
+  flex: 1;
+  resize: none;
+  min-height: 40px;
+  max-height: 120px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.input-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stream-toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #888; white-space: nowrap; }
+.stream-toggle input { accent-color: #7c6af7; }
+
+.btn-clear {
+  background: transparent;
+  color: #888;
+  border: 1px solid #333;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+.btn-clear:hover { color: #fff; border-color: #555; }
+
+/* --- Right Sidebar --- */
+.right-sidebar {
+  width: 220px;
+  background: #111;
+  border-left: 1px solid #2a2a2a;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+
+.right-sidebar h2 { font-size: 14px; font-weight: 600; color: #aaa; }
+
+.slider-group { display: flex; flex-direction: column; gap: 4px; }
+.slider-label { display: flex; justify-content: space-between; font-size: 12px; color: #888; }
+.slider-group input[type="range"] {
+  width: 100%;
+  accent-color: #7c6af7;
+  background: transparent;
+}
+
+#system-prompt {
+  min-height: 80px;
+  resize: vertical;
+  font-size: 12px;
+}
+
+.model-info { font-size: 12px; color: #888; }
+.model-info span { color: #ccc; }
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .left-sidebar, .right-sidebar { display: none; }
+}
+</style>
+</head>
+<body>
+
+<!-- Left Sidebar -->
+<div class="left-sidebar">
+  <h1>aat_llm</h1>
+
+  <div>
+    <label>Model</label>
+    <select id="model-select"><option value="">-- select model --</option></select>
+    <button onclick="refreshModels()" style="margin-top:8px;width:100%">Refresh Models</button>
+  </div>
+
+  <div class="pull-section">
+    <label>Pull Model</label>
+    <input type="text" id="pull-repo" placeholder="TheBloke/phi-2-GGUF">
+    <input type="text" id="pull-filename" placeholder="phi-2.Q4_K_M.gguf">
+    <button onclick="pullModel()" id="btn-pull">Pull</button>
+    <div class="pull-status" id="pull-status"></div>
+  </div>
+
+  <div>
+    <span class="status-dot offline" id="status-dot"></span>
+    <span id="status-text" style="font-size:12px;color:#888">Checking...</span>
+  </div>
+</div>
+
+<!-- Chat Panel -->
+<div class="chat-panel">
+  <div id="chat-history">
+    <div class="no-models-banner" id="banner">No models loaded. Pull one from the sidebar.</div>
+  </div>
+
+  <div class="input-bar">
+    <textarea id="prompt-input" placeholder="Send a message..." rows="1"></textarea>
+    <div class="input-controls">
+      <label class="stream-toggle">
+        <input type="checkbox" id="stream-toggle" checked> Stream
+      </label>
+      <button class="btn-clear" onclick="clearChat()">Clear</button>
+      <button id="btn-send" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- Right Sidebar -->
+<div class="right-sidebar">
+  <h2>Settings</h2>
+
+  <div class="slider-group">
+    <div class="slider-label"><span>Max Tokens</span><span id="val-max-tokens">512</span></div>
+    <input type="range" id="max-tokens" min="64" max="4096" step="64" value="512"
+      oninput="document.getElementById('val-max-tokens').textContent=this.value">
+  </div>
+
+  <div class="slider-group">
+    <div class="slider-label"><span>Temperature</span><span id="val-temperature">0.7</span></div>
+    <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.7"
+      oninput="document.getElementById('val-temperature').textContent=this.value">
+  </div>
+
+  <div class="slider-group">
+    <div class="slider-label"><span>Top P</span><span id="val-top-p">0.9</span></div>
+    <input type="range" id="top-p" min="0" max="1" step="0.05" value="0.9"
+      oninput="document.getElementById('val-top-p').textContent=this.value">
+  </div>
+
+  <div>
+    <label style="font-size:12px;color:#888">System Prompt</label>
+    <textarea id="system-prompt" placeholder="Optional system instructions..."></textarea>
+  </div>
+
+  <div class="model-info">
+    <h2>Model Info</h2>
+    <p>Name: <span id="info-name">-</span></p>
+    <p>Size: <span id="info-size">-</span></p>
+  </div>
+</div>
+
+<script>
+const chatHistory = document.getElementById('chat-history');
+const promptInput = document.getElementById('prompt-input');
+const btnSend = document.getElementById('btn-send');
+const modelSelect = document.getElementById('model-select');
+const banner = document.getElementById('banner');
+
+let messages = [];
+
+// Auto-resize textarea
+promptInput.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+// Ctrl+Enter to send
+promptInput.addEventListener('keydown', function(e) {
+  if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+});
+
+async function refreshModels() {
+  try {
+    const resp = await fetch('/api/tags');
+    const data = await resp.json();
+    const models = data.models || [];
+    modelSelect.innerHTML = '<option value="">-- select model --</option>';
+    models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.name;
+      opt.textContent = m.name;
+      modelSelect.appendChild(opt);
+    });
+    if (models.length > 0) {
+      banner.style.display = 'none';
+      modelSelect.value = models[0].name;
+      updateModelInfo(models[0]);
+    } else {
+      banner.style.display = 'block';
+    }
+  } catch(e) {
+    console.error('Failed to fetch models:', e);
+  }
+}
+
+modelSelect.addEventListener('change', async function() {
+  try {
+    const resp = await fetch('/api/tags');
+    const data = await resp.json();
+    const m = (data.models || []).find(x => x.name === this.value);
+    if (m) updateModelInfo(m);
+  } catch(e) {}
+});
+
+function updateModelInfo(m) {
+  document.getElementById('info-name').textContent = m.name;
+  document.getElementById('info-size').textContent = m.size_mb + ' MB';
+}
+
+async function checkHealth() {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  try {
+    const resp = await fetch('/health');
+    const data = await resp.json();
+    dot.className = 'status-dot online';
+    txt.textContent = 'Online (' + data.models_loaded + ' loaded)';
+  } catch(e) {
+    dot.className = 'status-dot offline';
+    txt.textContent = 'Offline';
+  }
+}
+
+async function pullModel() {
+  const repo = document.getElementById('pull-repo').value.trim();
+  const filename = document.getElementById('pull-filename').value.trim();
+  const status = document.getElementById('pull-status');
+  if (!repo || !filename) { status.textContent = 'Fill in both fields.'; return; }
+
+  status.textContent = 'Downloading...';
+  document.getElementById('btn-pull').disabled = true;
+  try {
+    const resp = await fetch('/api/pull', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ repo_id: repo, filename: filename })
+    });
+    const data = await resp.json();
+    status.textContent = data.status === 'downloading' ? 'Download started...' : data.status;
+    setTimeout(() => { refreshModels(); status.textContent = 'Done — check model list.'; }, 3000);
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+  }
+  document.getElementById('btn-pull').disabled = false;
+}
+
+function addBubble(role, text) {
+  banner.style.display = 'none';
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+  const label = document.createElement('div');
+  label.className = 'message-label';
+  label.textContent = role === 'user' ? 'You' : 'aat_llm';
+  const bubble = document.createElement('div');
+  bubble.className = 'message-bubble';
+  bubble.textContent = text;
+  div.appendChild(label);
+  div.appendChild(bubble);
+  chatHistory.appendChild(div);
+  chatHistory.scrollTop = chatHistory.scrollHeight;
+  return bubble;
+}
+
+async function sendMessage() {
+  const text = promptInput.value.trim();
+  const model = modelSelect.value;
+  if (!text) return;
+  if (!model) { alert('Select a model first.'); return; }
+
+  addBubble('user', text);
+  promptInput.value = '';
+  promptInput.style.height = 'auto';
+
+  const systemPrompt = document.getElementById('system-prompt').value.trim();
+  if (systemPrompt && messages.length === 0) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+  messages.push({ role: 'user', content: text });
+
+  const useStream = document.getElementById('stream-toggle').checked;
+  const maxTokens = parseInt(document.getElementById('max-tokens').value);
+  const temperature = parseFloat(document.getElementById('temperature').value);
+  const topP = parseFloat(document.getElementById('top-p').value);
+
+  btnSend.disabled = true;
+  const bubble = addBubble('assistant', '');
+
+  try {
+    if (useStream) {
+      const resp = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          model: model, prompt: text, stream: true,
+          max_tokens: maxTokens, temperature: temperature, top_p: topP
+        })
+      });
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let full = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        full += chunk;
+        bubble.textContent = full;
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+      }
+      messages.push({ role: 'assistant', content: full });
+    } else {
+      const resp = await fetch('/api/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          model: model, prompt: text, stream: false,
+          max_tokens: maxTokens, temperature: temperature, top_p: topP
+        })
+      });
+      const data = await resp.json();
+      bubble.textContent = data.response;
+      messages.push({ role: 'assistant', content: data.response });
+    }
+  } catch(e) {
+    bubble.textContent = 'Error: ' + e.message;
+  }
+  btnSend.disabled = false;
+}
+
+function clearChat() {
+  messages = [];
+  chatHistory.innerHTML = '';
+  banner.style.display = 'block';
+}
+
+// Init
+refreshModels();
+checkHealth();
+setInterval(checkHealth, 5000);
+</script>
+</body>
+</html>
