@@ -112,14 +112,16 @@ async def api_chat(req: ChatRequest):
 
     prompt = ""
     for msg in req.messages:
-        prompt += f"{msg['role']}: {msg['content']}\n"
-    prompt += "assistant: "
+        prompt += f"<|im_start|>{msg['role']}\n{msg['content']}<|im_end|>\n"
+    prompt += "<|im_start|>assistant\n"
+
+    stop = ["<|im_end|>", "<|im_start|>"]
 
     if req.stream:
         def generate_stream():
             for chunk in model(prompt, max_tokens=req.max_tokens,
                                temperature=req.temperature, top_p=req.top_p,
-                               stream=True):
+                               stop=stop, stream=True):
                 token = chunk["choices"][0]["text"]
                 yield token
 
@@ -130,9 +132,10 @@ async def api_chat(req: ChatRequest):
         max_tokens=req.max_tokens,
         temperature=req.temperature,
         top_p=req.top_p,
+        stop=stop,
     )
     text = output["choices"][0]["text"]
-    return {"message": {"role": "assistant", "content": text}}
+    return {"message": {"role": "assistant", "content": text.strip()}}
 
 
 @app.get("/api/tags")

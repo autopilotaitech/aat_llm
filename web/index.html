@@ -418,14 +418,16 @@ async function sendMessage() {
   const bubble = addBubble('assistant', '');
 
   try {
+    const reqBody = {
+      model: model, messages: [...messages], stream: useStream,
+      max_tokens: maxTokens, temperature: temperature, top_p: topP
+    };
+
     if (useStream) {
-      const resp = await fetch('/api/generate', {
+      const resp = await fetch('/api/chat', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          model: model, prompt: text, stream: true,
-          max_tokens: maxTokens, temperature: temperature, top_p: topP
-        })
+        body: JSON.stringify(reqBody)
       });
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
@@ -440,17 +442,15 @@ async function sendMessage() {
       }
       messages.push({ role: 'assistant', content: full });
     } else {
-      const resp = await fetch('/api/generate', {
+      const resp = await fetch('/api/chat', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          model: model, prompt: text, stream: false,
-          max_tokens: maxTokens, temperature: temperature, top_p: topP
-        })
+        body: JSON.stringify(reqBody)
       });
       const data = await resp.json();
-      bubble.textContent = data.response;
-      messages.push({ role: 'assistant', content: data.response });
+      const content = data.message ? data.message.content : data.response;
+      bubble.textContent = content;
+      messages.push({ role: 'assistant', content: content });
     }
   } catch(e) {
     bubble.textContent = 'Error: ' + e.message;
